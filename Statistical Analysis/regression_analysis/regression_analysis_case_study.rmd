@@ -1,0 +1,169 @@
+---
+title: "大作业：案例分析"
+author:
+  - 沈雨萱 3180104691
+documentclass: ctexart
+geometry: "left=2.5cm,right=2cm,top=3cm,bottom=2.5cm"
+output:
+  rticles::ctex:
+    fig_caption: yes
+    number_sections: yes
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 概况
+一．	数据集介绍
+数据集记录了某产品在200个不同市场的销售情况及该产品在每个市场中3类广告媒体的预算，这3类媒体是：TV, radio, newspaper.
+
+因变量：sales，表示销量
+
+自变量：TV，radio，newspaper，表示在不同媒体上的广告预算
+
+目标：分析sales与TV，radio，newspaper之间的依赖关系。
+
+
+二．	实验内容 
+
+针对因变量sales(Y),自变量TV(tv)，radio(rdo)，newspaper(nsp)，X=(1n,tv,rdo,nsp) 
+建立线性回归模型 Y=X$\beta$ + e, 假设e ~ N(0,$\sigma^2I_n$)
+
+
+
+
+```{r 1,echo=F,results='hide',message=FALSE,warning=FALSE}
+setwd("D:/enjoy/回归分析")
+library(ggplot2)
+library(patchwork)
+library(ggpubr)
+library(MASS)
+library(DAAG)
+```
+
+# 实验结果
+
+首先应用最小二乘法获得结果
+
+```{r 2,error=FALSE,warning = FALSE}
+adv <- read.csv("Advertising.csv",encoding = "UTF-8",na.strings=c(""," ","NA"),header=T,row.names = 1) 
+y=adv[, 4] 
+tv=adv[, 1]
+rdo=adv[, 2]
+nsp=adv[, 3]
+mydata=data.frame(y,tv,rdo,nsp)
+plot(y~tv+rdo+nsp)
+lm.sol=lm(y~tv+rdo+nsp,data=mydata)
+abline(lm.sol)
+summary(lm.sol)
+```
+
+初步得到的回归方程为y=2.938889+0.045765tv+0.188530rdo-0.001037nsp
+
+## 回归诊断 
+
+首先模型诊断
+
+```{r 3,error=FALSE,warning = FALSE}
+#作残差图
+y.fit=predict(lm.sol)
+plot(lm.sol,which=1)
+#qq图正态性检验
+c1 <- ggqqplot(mydata$tv,main='TV')
+c2 <- ggqqplot(mydata$rdo,main='radio')
+c3 <- ggqqplot(mydata$nsp,main='newspaper')
+c1+c2+c3
+```
+
+如图可以看到：
+1.图形没有呈现明显有规则的形状，因此线性假设基本合理
+2. 残差呈现一定的“喇叭型”或“倒喇叭型”的形状，可能不符合符合方差齐性
+3.残差图上的点有一定的集团性，可能不相关性不成立。
+4.残差大致分布在$|r_i|\leq 2$ 区域内，但集中区域有所不同.从qq图可以看出，TV,radio,newspaper三项基本符合正态分布
+
+接下来进行异常点诊断
+
+```{r 4,error=FALSE,warning = FALSE,message=FALSE}
+par(pin=c(4,4))
+r.std=rstandard(lm.sol)
+plot(r.std~y.fit)
+text(y.fit,r.std,label=seq(1,200,1))
+influence.measures(lm.sol)
+which(abs(r.std)>2)
+influence.measures(lm.sol)
+```
+
+根据残差判定异常点有6  26  36  79 127 131 179
+
+强影响点有6,17,36,76,102,127,131,166,179,
+
+对数据作删去异常点的处理，并作方差稳定性变换
+
+```{r 5,error=FALSE,warning = FALSE,message=FALSE}
+d <- c(6,26,36,79,127,131,179)
+adv <- adv[-d,]
+y <- adv[,4]
+tv <- adv[,1]
+rdo <- adv[,2]
+nsp <- adv[,3]
+z=sqrt(y)
+mydata2=data.frame(z,tv,rdo,nsp)
+lm.sol2=lm(z~tv+rdo+nsp,data=mydata2)
+plot(lm.sol2,which=1)
+c1 <- ggqqplot(mydata2$tv,main='TV')
+c2 <- ggqqplot(mydata2$rdo,main='radio')
+c3 <- ggqqplot(mydata2$nsp,main='newspaper')
+c1+c2+c3
+```
+
+由本次结果可见模型基本满足线性，方差齐性，正态性和不相关性。
+
+
+## 多重共线性检验
+
+
+```{r 6,error=FALSE,warning = FALSE}
+#VIF诊断
+vif(lm.sol2)
+#特征根与条件数诊断
+X=cbind(tv,rdo,nsp)
+rho=cor(X)
+eigen(rho)
+kappa(rho,exact=TRUE)
+```
+
+根据结果认为并不存在严重的多重共线性。
+
+## 回归方程和回归系数的显著性检验
+
+最终可以得到的回归方程为
+```{r 9,error=FALSE,warning = FALSE}
+summary(lm.sol2)
+```
+$\sqrt{y}=2.2676843+0.0060511tv+0.0249715rdo-0.0008940nsp$
+
+p-value: < 2.2e-16 ，所以认为回归自变量整体对因变量有显著的线性影响。
+
+因为p1<2e-16,p2<2e-16,p3>=0.05,因此我们拒绝$H_1:\beta_1=0 和 H_2:\beta_2=0,接受H3:\beta_3=0$，剔除nsp后重新进行回归分析
+
+
+
+
+```{r 7,error=FALSE,warning = FALSE}
+lm.sol3=lm(z~tv+rdo,data=mydata2)
+summary(lm.sol3)
+```
+
+得回归模型为$\sqrt{y}=0.0060462tv+0.244878rdo$ 
+
+验证：利用逐步回归法
+```{r 8,error=FALSE,warning = FALSE}
+min.model=lm(z~1,data=mydata2)
+step.model=step(min.model,direction="both",
+scope=(~tv+rdo+nsp))
+summary(step.model)
+```
+
+得到结果类似，因此可以确定结论销量主要与tv和radio有关，且满足$\sqrt{y}=0.0060462tv+0.244878rdo$ 

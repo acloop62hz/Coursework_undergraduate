@@ -1,0 +1,98 @@
+---
+title: "实验四：判别分析"
+author:
+  - 沈雨萱 3180104691
+documentclass: ctexart
+geometry: "left=2.5cm,right=2cm,top=3cm,bottom=2.5cm"
+output:
+  rticles::ctex:
+    fig_caption: yes
+    number_sections: yes
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 实验概况
+一．	实验目的与要求：
+通过本试验项目，使学生理解并掌握如下内容
+    （1）处理判别分析的基本步骤；
+    （2）熟悉各类判别方法；
+
+
+二．	实验内容 
+1. 利用第五章的数据和上机指导五，熟悉R在判别分析中的应用（请动手操作）；
+2.采用“肝胆病患者检查数据”（见附件）。这是一组医院病人的资料，基本包括了四变量分别为：总胆红素(umol/L)，白蛋白（g/L），碱性磷酸酶，谷丙转氨酶和医生诊断结果，希望通过这组数据（学习样本）建立判别肝、胆疾病的判别函数，并应用于“体检数据”中，根据体检资料（见附件）分析是否有得肝胆疾病的可能性；
+
+
+```{r 1,echo=F,results='hide',message=FALSE,warning=FALSE}
+library(ICSNP)
+library(MASS)
+library(dplyr)
+library(pheatmap)
+setwd("D:/enjoy/多元统计/第四次上机实验/第四次上机实验")
+```
+
+# 实验结果
+
+a. 均值的显著性检验
+
+```{r 2,error=FALSE,warning = FALSE}
+data <- read.csv("肝胆病患者检查数据.csv",encoding = "UTF-8",na.strings=c(""," ","NA")) 
+d1=data %>% filter(group==1)
+d1m=d1[1:nrow(d1),2:5]
+d2=data %>% filter(group==2)
+d2m=d2[1:nrow(d2),2:5]
+d3=data %>% filter(group==3)
+d3m=d3[1:nrow(d3),2:5]
+d4=data %>% filter(group==4)
+d4m=d4[1:nrow(d4),2:5]
+d5=data %>% filter(group==5)
+d5m=d5[1:nrow(d5),2:5]
+dlist <- list(d1m,d2m,d3m,d4m,d5m)
+a <- matrix(0,5,5)
+for (i in 1:5){
+  for (j in 1:5){
+    a[i,j] = HotellingsT2(dlist[[i]],dlist[[j]])$p.value
+  }
+}
+pheatmap(a,cluster_rows = FALSE, cluster_cols = FALSE, display_numbers = TRUE)
+
+```
+
+可以看到5中疾病类型组间均值存在显著性差异
+
+b.建立判别函数
+```{r 3,error=FALSE,warning = FALSE}
+datar <- data[,2:6]
+attach(datar)
+lda(group~BIL+Alb+ALP+ALT, datar)
+```
+c.利用判别函数做判别
+```{r 4,error=FALSE,warning = FALSE}
+lda.sol <- lda(group~BIL+Alb+ALP+ALT, datar)
+results <- predict(lda.sol, datar)
+table(datar$group, results$class)
+```
+
+可以看到对疾病类型3,4（慢胆，急胆）的预测效果不佳, 对疾病类型1，2，5的效果尚可
+
+c.根据判别函数去分析体检数据
+```{r 5,error=FALSE,warning = FALSE}
+datatj <- read.csv("体检资料.csv",encoding = "UTF-8",na.strings=c(""," ","NA")) 
+tj_l <- datatj[,c(16,18,20,22)]
+colnames(tj_l) <- c('ALT','BIL','ALP','Alb')
+results <- predict(lda.sol, tj_l)
+table(results$class)
+```
+根据所建立的判别函数确定体检对象大多为正常，有少数可能有慢胆。
+```{r 5,error=FALSE,warning = FALSE}
+d2 <- read.csv("5-9.csv",encoding = "UTF-8",na.strings=c(""," ","NA")) 
+attach(d2)
+lda.sol <- lda(group~Cu+Ag+Bi, d2)
+d3 <- data.frame(Cu=2.95,Ag=2.15,Bi=1.54)
+results <- predict(lda.sol, d3)
+results$class
+```

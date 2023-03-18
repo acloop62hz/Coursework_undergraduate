@@ -1,0 +1,236 @@
+---
+title: "实验三：利用R软件单变量和多变量正态检验和置信区域等"
+author:
+  - 沈雨萱 3180104691
+documentclass: ctexart
+geometry: "left=2.5cm,right=2cm,top=3cm,bottom=2.5cm"
+output:
+  rticles::ctex:
+    fig_caption: yes
+    number_sections: yes
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 实验概况
+一．	实验目的与要求：
+通过本试验项目，能够理解并掌握如下内容
+(1)单变量和多变量正态检验；
+(2) 多变量均值向量显著性检验；
+(3)置信域和置信区间计算，画置信椭球等
+
+
+
+二．	实验内容 
+(I) 采用实验二sample样本。附表中的数据sample.xls进行分析。记X1=BMI, X2=FPG, X3=SBP, X4=DBP, X5=TG, X6=HDL-C，并构成一个向量。X=(X1, X2, X3, X4, X5, X6),详细分析患代谢综合症的群体与没有患代谢综合症群的差异分析。（任选一项）
+1.	分析患代谢综合症的年龄差异
+2.	分析患代谢综合症的性别差异
+3.	分析是否吸烟 对患代谢综合症的影响
+4.	分析是否喝酒对患代谢综合症的影响
+提示分析内容：
+(a)	数据预处理
+(b)	检验相关数据正态性，相关性
+(c)	分析人群患代谢综合症的比例
+(d)	计算患代谢综合症的群体与没有患代谢综合症群体各类指标（体重指数、血压、血指、血糖等等指标的均值和置信区间分析差异。
+
+(II) 数据ex2.1：给出了27,名糖尿病人血清总胆固醇(x1), 甘油（x2）,空腹胰岛素(x3),糖化血红蛋白(x4),空腹血糖(y)的测量值。
+（1）试建立血糖(y)与其他指标的线性回归方程，并进行分析；
+（2）（x1, x2, x3, x4）是否服从多元正态？（x1,x2）与（x3,x4）是否相互独立？
+
+```{r 1,echo=F,results='hide',message=FALSE,warning=FALSE}
+library(ggplot2)
+library(patchwork)
+library(ggpubr)
+library(Hmisc)
+library(PerformanceAnalytics)
+library(dplyr)
+```
+
+# 实验结果
+
+## (I)
+
+a. 患代谢综合症的群体与没有患代谢综合症群的差异分析。
+
+```{r 2,error=FALSE,warning = FALSE}
+data <- read.csv("sample.csv",encoding = "UTF-8",na.strings=c(""," ","NA")) 
+X <- data[,c('weight','height','FPG','sbp','dbp','TG','HDL.C')]
+#去除缺失值
+X <- na.omit(X)
+#计算BMI并删去weight和height
+X$'BMI'=X$weight/(X$height*X$height)*10000
+X <- X[ , !names(X) %in% c("weight", "height")]
+#计算相关性
+r <- rcorr(as.matrix(X))
+chart.Correlation(X, histogram=TRUE, pch=19)
+#正态性检验
+c1 <- ggqqplot(X$FPG,main='FPG')
+c2 <- ggqqplot(X$sbp,main='sbp')
+c3 <- ggqqplot(X$dbp,main='dbp')
+c4 <- ggqqplot(X$TG,main='TG')
+c5 <- ggqqplot(X$HDL.C,main='HDL.C')
+c6 <- ggqqplot(X$BMI,main='BMI')
+c1+c2+c3+c4+c5+c6
+```
+可以看到FPG和TG不太符合正态分布，而sbp,dbp,HDL.C,BMI较符合正态分布
+
+```{r 3,error=F,warning = FALSE}
+data <- read.csv("sample.csv",encoding = "UTF-8",na.strings=c(""," ","NA")) 
+#筛选代谢综合征的病人
+data <- na.omit(data)
+data$'BMI'=data$weight/(data$height*data$height)*10000
+data$'disease'=0
+sick <- ((data[, 'BMI'] >= 25) + (data[, 'FPG'] >=6.1)+((data[, 'sbp'] >= 140)|(data[, 'dbp'] >= 90))+((data[, 'TG'] >= 1.7)|((data[, 'HDL.C'] < 0.9)&(data[, 'gender']=='男'))|((data[, 'HDL.C'] < 1)&(data[, 'gender']=='女'))))>=3
+data[which(sick == TRUE),'disease']=1
+#调整异常值
+unique(data$smoke)
+unique(data$drunk)
+data$smoke <- gsub( "已戒烟", "否",data$smoke)
+data$smoke <- gsub( "戒烟2个月", "是",data$smoke)
+data$smoke <- gsub( "戒烟3年", "否",data$smoke)
+data$drunk <- gsub( "无", "否",data$drunk)
+#计算不同年龄组人群中患代谢综合征的比例
+age_range <- c('0-10','11-20','21-30','31-40','41-50','51-60','61-70','71-80')
+p <- c()
+for (i in 1:8){
+  nd=nrow(data %>% filter(age>=(i-1)*10+1 & age<=i*10 & disease==1))
+  na=nrow(data %>% filter(age>=(i-1)*10+1 & age<=i*10 ))
+  p <- c(p,nd/na)
+}
+df <- data.frame(x = age_range, y = p)
+ggplot(df, aes(x =x, y = y, group = 1)) + geom_line() + xlab('age')+ylab('percent')
+#显著性检验
+age_d <- filter(data,disease==1)$age
+age_h <- filter(data,disease==0)$age
+t.test(age_d,age_h, alternative = c("two.sided", "less", "greater"),mu = 0,paired = FALSE, var.equal = FALSE, conf.level = 0.95)
+
+```
+
+
+可以看到41-70岁人群中得代谢病得比例较高。在显著性水平α=0.05的情况下得病与不得病人群得年龄存在显著性差异
+
+```{r 5,error=F,warning = FALSE}
+#根据之前结果，把人群分为0-50，51-80两个年龄组
+#计算两个组是否患代谢综合症群体各类指标的均值估计和置信区间或区域
+a <- c()
+items <- c('BMI','FPG','sbp','dbp','TG','HDL.C')
+sick <- list(mean=a,low=a,high=a)
+healthy <-list(mean=a,low=a,high=a)
+#0-50组
+nd=data %>% filter(age<=50 & disease==1)
+nh=data %>% filter(age<=50 & disease==0)
+count=1
+for (i in items){
+  sick$mean[count] <- colMeans(nd[i])
+  sick$low[count] <- t.test(nd[i],conf.level = 0.95)$conf.int[1]
+  sick$high[count] <- t.test(nd[i],conf.level = 0.95)$conf.int[2]
+  healthy$low[count] <- t.test(nh[i],conf.level = 0.95)$conf.int[1]
+  healthy$high[count] <- t.test(nh[i],conf.level = 0.95)$conf.int[2]
+  healthy$mean[count] <- colMeans(nh[i])
+  count=count+1
+}
+r <- data.frame(item = items, value=c(sick$mean,healthy$mean),
+ci_lower = c(sick$low,healthy$low),
+ci_upper = c(sick$high,healthy$high),
+group=c(rep('sick',times=6),rep('healthy',times=6)))
+ggplot(r,aes(item, value,group = group,color=group)) + 
+  geom_ribbon(aes(ymin = r$ci_lower,
+                  ymax = r$ci_upper),
+              fill = "grey") + 
+  geom_line(size = 1)+
+  theme_minimal()
+```
+
+可以看到对于0-50岁得病群体和健康群体，其BMI,dbp和sbp项的均值估计差异较大。下面针对51-80群体作图
+
+```{r 6,echo=F,error=F,warning = FALSE}
+#根据之前结果，把人群分为0-50，51-80两个年龄组
+#计算两个组是否患代谢综合症群体各类指标的均值估计和置信区间或区域
+a <- c()
+items <- c('BMI','FPG','sbp','dbp','TG','HDL.C')
+sick <- list(mean=a,low=a,high=a)
+healthy <-list(mean=a,low=a,high=a)
+#51-80组
+nd=data %>% filter(age>50 & disease==1)
+nh=data %>% filter(age>50 & disease==0)
+count=1
+for (i in items){
+  sick$mean[count] <- colMeans(nd[i])
+  sick$low[count] <- t.test(nd[i],conf.level = 0.95)$conf.int[1]
+  sick$high[count] <- t.test(nd[i],conf.level = 0.95)$conf.int[2]
+  healthy$low[count] <- t.test(nh[i],conf.level = 0.95)$conf.int[1]
+  healthy$high[count] <- t.test(nh[i],conf.level = 0.95)$conf.int[2]
+  healthy$mean[count] <- colMeans(nh[i])
+  count=count+1
+}
+r <- data.frame(item = items, value=c(sick$mean,healthy$mean),
+ci_lower = c(sick$low,healthy$low),
+ci_upper = c(sick$high,healthy$high),
+group=c(rep('sick',times=6),rep('healthy',times=6)))
+ggplot(r,aes(item, value,group = group,color=group)) + 
+  geom_ribbon(aes(ymin = r$ci_lower,
+                  ymax = r$ci_upper),
+              fill = "grey") + 
+  geom_line(size = 1)+
+  theme_minimal()
+```
+可以看到对于51-80岁得病群体和健康群体，sbp项与BMI项的均值估计差异没有0-51岁那么显著，推测可能高龄群体得代谢病会受更多因素影响。
+
+## (II)
+数据ex2.1：给出了27,名糖尿病人血清总胆固醇(x1), 甘油（x2）,空腹胰岛素(x3),糖化血红蛋白(x4),空腹血糖(y)的测量值。
+（1）试建立血糖(y)与其他指标的线性回归方程，并进行分析；
+
+```{r 7,error=FALSE,warning = FALSE}
+data2 <- read.csv("ex2.1.csv",encoding = "UTF-8",na.strings=c(""," ","NA")) 
+data2 <- na.omit(data2)
+fit <- lm(y ~ x1+x2+x3+x4,data=data2)
+summary(fit)
+```
+根据回归结果得到得线性回归方程为y=0.1424x1+0.3515x2-0.2706x3+0.6382x4
+根据p-value,该线性回归方程拟合效果较差。
+
+（2）（x1, x2, x3, x4）是否服从多元正态？（x1,x2）与（x3,x4）是否相互独立？
+```{r 8,warning = FALSE}
+#首先进行一元正态的评估
+c1 <- ggqqplot(data2$x1,main='x1')
+c2 <- ggqqplot(data2$x2,main='x2')
+c3 <- ggqqplot(data2$x3,main='x3')
+c4 <- ggqqplot(data2$x4,main='x4')
+c1+c2+c3+c4
+```
+```{r 9,warning = FALSE}
+#线性关系检验
+pairs(data2[,2:5])
+#多元正态卡方统计量的Q-Q图检验法
+mx<-t(as.matrix(data2[,2:5]))#将数据框转化成矩阵,给矩阵转置，变成一列有P个变量的矩阵，一列就是一个观测值
+m<-matrix(colMeans(data2[,2:5]))#计算均值向量
+d<-apply(mx,2,function(x){x-m})#每个观测值减去均值向量
+ms<-apply(d,2,function(x){t(x)%*%cov(data2[,2:5])%*%x})#每个观测值的马氏距离
+#绘制QQ图
+p<- (rank(ms)-0.5)/length(ms)#算累积概率
+k<-qchisq(p,df=4)#根据卡方分布的概率求出27个分位点，一个累积概率求出一个点
+plot(ms,k)
+lines(k,k)
+```
+
+根据卡方统计量Q-Q检验法可以看出(X1,X2,X3,X4)不符合多元正态分布
+```{r 10,warning = FALSE}
+#进行独立性检验
+md <- as.matrix(data2[,2:5])
+mm <- diag(1,27) - matrix(1,27,27)/27
+#样本离散阵
+A <- t(md)%*%mm%*%md
+p=4
+p1=p2=2
+n=27
+b = n-1.5-(p^3-sum(p1^3+p2^3))/(3*(p^2-sum(p1^2+p2^2)))
+f = 0.5*(p*(p+1)-sum(p1^2+p1+p2^2+p2))
+V=det(A)/(det(A[1:2,1:2])*det(A[3:4,3:4]))
+ep = -b*log(V)
+ep
+qchisq(0.95,f)
+```
+因为 7.602315 < 9.487729 因此接受假设，(X1,x2)与(X3,X4)独立

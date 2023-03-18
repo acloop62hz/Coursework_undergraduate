@@ -1,0 +1,217 @@
+---
+title: "实验二：利用R软件实现多元数据进行可视化和参数估计"
+author:
+  - 沈雨萱 3180104691
+documentclass: ctexart
+geometry: "left=2.5cm,right=2cm,top=3cm,bottom=2.5cm"
+output:
+  rticles::ctex:
+    fig_caption: yes
+    number_sections: yes
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 实验概况
+一．	实验目的与要求：
+通过本试验，实现下列目标：
+（1）多元数据分析图示，轮廓图、雷达图、调和曲线图和散布图矩阵； （2）能够利用R求解多元正态随机向量的均值、协方差、样本相关矩阵等参数的极大似然估计；
+（3）能够对简单时间序列参数估计的效果进行估计。
+
+
+二．	实验内容 
+(1) 附表中的数据sample.xls进行分析。记X1=BMI, X2=FPG, X3=SBP, X4=DBP, X5=TG, X6=HDL-C，并构成一个向量，X=(X1, X2, X3, X4, X5, X6)。
+a.分析X各变量之间的相关性？
+b.分析患代谢综合症的比例有没有性别差异，与吸烟或喝酒是否有关？
+c.利用多元数据分析图给出20~30年龄段， X各个指标的分布情况。
+d.给出总体X的均值、协方差矩阵和相关矩阵的估计。
+
+(2)假设Yt服从下面的模型：Y0=0, 
+Yt= θYt-1  + εt, t=1, 2, …, n。
+利用随机模拟分析下面两种情况下，对参数θ估计量进行分析(如通过均方误差(MSE)来说明）。
+（1）	θ的真值为0.6； （2）θ的真值为1。
+
+
+# 实验结果
+
+## 附表分析
+有代谢综合症的人,其罹患心血管疾病、脑血管疾病及肾脏疾病的危险比没有代谢综合症的人高,因此代谢综合症的预防与治疗,是目前临床医学及基础研究关注的主题.中华医学会糖尿病学分会（CDS）建议代谢综合征的诊断标准: 具备以下4项中的3项及以上即为代谢综合症:
+(1)	 超重:  　BMI>= 25.0  Kg/M^2(体重/身高平方) ;
+(2)	高血糖:FPG>= 6.1mmol/L(110mg/dl)或 2hPG>=7.8  mmol/L(140mg/dl), 或已确诊糖尿病并治疗者;
+(3)	高血压:　收缩压 SBP >=e 140 mmHg  或 舒张压DBP>= 90mmHg,  或已确诊高血压并治疗者;
+(4)	空腹血:  甘油三脂 TG>=1.7 mmol/L(110mg/dl)  或   HDL-C  <0.9  mmol/L( 35 mg/dl)（男）,  <1.0 mmol/L( 39  mg/dl) （女）.
+
+
+代谢综合征的发病机制至今为止还不甚清楚,但可以明确直接发病的原因是胰岛素抵抗, 与不良的饮食习惯(如经常抽烟、喝酒等)和生活方式(如缺乏运动) 密切相关. 为了进一步研究代谢综合征影响因素,现收集了某个地区的体检资料。见 sample.xls.
+
+a. 分析X各变量之间的相关性
+```{r 15,echo=F,results='hide',message=FALSE,warning=FALSE}
+library(dplyr)
+library(Hmisc)
+library(PerformanceAnalytics)
+library(fmsb)
+
+```
+
+```{r 1,error=FALSE,warning = FALSE}
+data <- read.csv("sample.csv",encoding = "UTF-8",na.strings=c(""," ","NA")) 
+X <- data[,c('weight','height','FPG','sbp','dbp','TG','HDL.C')]
+#去除缺失值
+X <- na.omit(X)
+#计算BMI并删去weight和height
+X$'BMI'=X$weight/(X$height*X$height)*10000
+X <- X[ , !names(X) %in% c("weight", "height")]
+#计算相关性
+r <- rcorr(as.matrix(X))
+chart.Correlation(X, histogram=TRUE, pch=19)
+```
+
+b.分析患代谢综合症的比例有没有性别差异，与吸烟或喝酒是否有关？
+
+```{r 2,error=F,warning = FALSE}
+data <- read.csv("sample.csv",encoding = "UTF-8",na.strings=c(""," ","NA")) 
+#筛选代谢综合征的病人
+data <- na.omit(data)
+data$'BMI'=data$weight/(data$height*data$height)*10000
+data$'disease'=0
+sick <- ((data[, 'BMI'] >= 25) + (data[, 'FPG'] >=6.1)+((data[, 'sbp'] >= 140)|(data[, 'dbp'] >= 90))+((data[, 'TG'] >= 1.7)|((data[, 'HDL.C'] < 0.9)&(data[, 'gender']=='男'))|((data[, 'HDL.C'] < 1)&(data[, 'gender']=='女'))))>=3
+data[which(sick == TRUE),'disease']=1
+#调整异常值
+unique(data$smoke)
+unique(data$drunk)
+data$smoke <- gsub( "已戒烟", "否",data$smoke)
+data$smoke <- gsub( "戒烟2个月", "是",data$smoke)
+data$smoke <- gsub( "戒烟3年", "否",data$smoke)
+data$drunk <- gsub( "无", "否",data$drunk)
+gender <- c(sum(((data[, 'gender']=='男')&(data[, 'disease']==1))==TRUE)/sum((data[, 'gender']=='男')==TRUE),sum(((data[, 'gender']=='女')&(data[, 'disease']==1))==TRUE)/sum((data[, 'gender']=='女')==TRUE))
+smoke <- c(sum(((data[, 'smoke']=='是')&(data[, 'disease']==1))==TRUE)/sum((data[, 'smoke']=='是')==TRUE),sum(((data[, 'smoke']=='否')&(data[, 'disease']==1))==TRUE)/sum((data[, 'smoke']=='否')==TRUE))
+drunk <- c(sum(((data[, 'drunk']=='是')&(data[, 'disease']==1))==TRUE)/sum((data[, 'drunk']=='是')==TRUE),sum(((data[, 'drunk']=='否')&(data[, 'disease']==1))==TRUE)/sum((data[, 'drunk']=='否')==TRUE))
+show <- data.frame(gender,smoke,drunk)
+show
+```
+可以看到，患代谢病比例与男女、吸烟与否、饮酒与否有较大关系，男性，吸烟者，饮酒者中患代谢病的人比例更高。
+
+c.利用多元数据分析图给出20~30年龄段， X各个指标的分布情况
+筛选并绘制雷达图
+```{r 4,error=F,warning = FALSE}
+data <- read.csv("sample.csv",encoding = "UTF-8",na.strings=c(""," ","NA")) 
+X <- data[,c('age','weight','height','FPG','sbp','dbp','TG','HDL.C')]
+#去除缺失值
+X <- na.omit(X)
+#计算BMI并删去weight和height
+X$'BMI'=X$weight/(X$height*X$height)*10000
+X3<- filter(X,age>=20&age<=30)
+X3 <- X3[ , !names(X3) %in% c("weight", "height","age")]
+X3.2<-rbind(c(4,90,50,0,0,15),c(6,125,100,5,3,35),X3)
+radarchart(X3.2)
+```
+
+d.给出总体X的均值、协方差矩阵和相关矩阵的估计
+```{r 3,error=FALSE,warning = FALSE}
+data <- read.csv("sample.csv",encoding = "UTF-8",na.strings=c(""," ","NA")) 
+X <- data[,c('weight','height','FPG','sbp','dbp','TG','HDL.C')]
+#去除缺失值
+X <- na.omit(X)
+#计算BMI并删去weight和height
+X$'BMI'=X$weight/(X$height*X$height)*10000
+X3 <- X3[ , !names(X3) %in% c("weight", "height","age")]
+rmean <- vector()
+for (i in 1:ncol(X3))
+{
+  rmean = c(rmean,mean(X3[,i]))
+}
+#显示平均值，协方差矩阵，相关矩阵
+rbind(names(X3),rmean)
+cov(X3)
+cor(X3)
+```
+
+## 参数估计
+(2)假设Yt服从下面的模型：Y0=0, 
+Yt= θYt-1  + εt, t=1, 2, …, n。
+利用随机模拟分析下面两种情况下，对参数θ估计量进行分析(如通过均方误差(MSE)来说明）。
+a. θ的真值为0.6；所展示为样本容量为10的代码，其余代码省略
+```{r 5,warning = FALSE}
+y <- c(0)
+for (i in 1:10){
+  y = c(y,0.6*y[i]+rnorm(1))
+}
+y1 <- y[2:11]
+x <- y[1:10]
+#最小二乘法求估计量
+lm.sol<-lm(y1 ~ 0+x)
+summary(lm.sol)
+MSE.10 <- sum(residuals(lm.sol)^2)/9
+     
+```
+```{r 6,echo=F,results='hide',message=FALSE,Warning=FALSE}
+y <- c(0)
+for (i in 1:100){
+  y = c(y,0.6*y[i]+rnorm(1))
+}
+y1 <- y[2:101]
+x <- y[1:100]
+#最小二乘法求估计量
+lm.sol<-lm(y1 ~ 0+x)
+summary(lm.sol)
+MSE.100 <- sum(residuals(lm.sol)^2)/99
+y <- c(0)
+for (i in 1:1000){
+  y = c(y,0.6*y[i]+rnorm(1))
+}
+y1 <- y[2:1001]
+x <- y[1:1000]
+#最小二乘法求估计量
+lm.sol<-lm(y1 ~ 0+x)
+summary(lm.sol)
+MSE.1000 <- sum(residuals(lm.sol)^2)/999
+```
+不同样本容量下估计量的MSE：
+```{r 7,warning = FALSE}
+data.frame(MSE.10,MSE.100,MSE.1000)
+```
+b. θ的真值为1。
+
+```{r 8,echo=F,results='hide',message=FALSE,Warning=FALSE}
+y <- c(0)
+for (i in 1:10){
+  y = c(y,1*y[i]+rnorm(1))
+}
+y1 <- y[2:11]
+x <- y[1:10]
+#最小二乘法求估计量
+lm.sol<-lm(y1 ~ 0+x)
+summary(lm.sol)
+MSE2.10 <- sum(residuals(lm.sol)^2)/9
+
+y <- c(0)
+for (i in 1:100){
+  y = c(y,1*y[i]+rnorm(1))
+}
+y1 <- y[2:101]
+x <- y[1:100]
+#最小二乘法求估计量
+lm.sol<-lm(y1 ~ 0+x)
+summary(lm.sol)
+MSE2.100 <- sum(residuals(lm.sol)^2)/99
+
+y <- c(0)
+for (i in 1:1000){
+  y = c(y,1*y[i]+rnorm(1))
+}
+y1 <- y[2:1001]
+x <- y[1:1000]
+#最小二乘法求估计量
+lm.sol<-lm(y1 ~ 0+x)
+summary(lm.sol)
+MSE2.1000 <- sum(residuals(lm.sol)^2)/999
+     
+```
+不同样本容量下估计量的MSE：
+```{r 9,warning = FALSE}
+data.frame(MSE2.10,MSE2.100,MSE2.1000)
+```
+可见样本容量越大，估计量越接近真实值

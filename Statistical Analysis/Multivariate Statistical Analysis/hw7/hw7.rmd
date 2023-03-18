@@ -1,0 +1,138 @@
+---
+title: "实验七：因子分析"
+author:
+  - 沈雨萱 3180104691
+documentclass: ctexart
+geometry: "left=2.5cm,right=2cm,top=3cm,bottom=2.5cm"
+output:
+  rticles::ctex:
+    fig_caption: yes
+    number_sections: yes
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 实验概况
+一．	实验目的与要求：
+通过本试验项目，使学生理解并掌握如下内容
+（1）熟悉潜在因子模型载荷矩阵的不同估计方法；
+（2）熟悉潜在因子个数的确定方法，因子得分的计算；
+（3）能够利用因子模型（或正交旋转）对所考虑问题做出合理的解释；
+
+
+
+
+二．	实验内容 
+
+（1）我国2010你那各地区城镇居民家庭平均每人全年消费数据如ex6.7所示，这些数据指标分别从食品（x1）,衣着（x2），居住(x3)，医疗(x4)，交通通信(x5)，教育(x6)，家政(x7)和耐用消费品(x8)来描述消费。试对该数据进行因子分析。
+
+ （2）采用“体检数据”。这是一组4000多个样本的体检资料，分别有常规体检的一系列指标，其中，体检数据，请考虑下面的问题：
+一、	利用主成分方法变量进行降维，然后进行相应的主成分方法聚类分析；
+二、	构建因子分析模型，进行因子旋转，分析每个因子的意义及这些潜在的因子与年龄的关系。
+
+
+
+```{r 1,echo=F,results='hide',message=FALSE,warning=FALSE}
+library(ggplot2)
+library(patchwork)
+library(ggpubr)
+library(dplyr)
+library(Hmisc)
+library(PerformanceAnalytics)
+library(NbClust)
+setwd("D:/enjoy/多元统计/上机实验七/上机实验七")
+```
+
+# 实验结果
+
+## （1）
+
+（1）我国2010你那各地区城镇居民家庭平均每人全年消费数据如ex6.7所示，这些数据指标分别从食品（x1）,衣着（x2），居住(x3)，医疗(x4)，交通通信(x5)，教育(x6)，家政(x7)和耐用消费品(x8)来描述消费。试对该数据进行因子分析。
+
+```{r 2,error=FALSE,warning = FALSE}
+data_0 <- read.csv("ex6.7.csv",encoding = "UTF-8",na.strings=c(""," ","NA"),header=T)
+data_0 <- na.omit(data_0)
+row.names(data_0) <- data_0[,1]
+X<-data_0[,-1]
+# 确定应提取的因子个数
+library(nFactors)
+ev <- eigen(cor(X)) # 获取特征值
+ap <- parallel(subject=nrow(X),var=ncol(X),
+  rep=100,cent=.05) # subject指样本个数，var是指变量个数
+nS <- nScree(x=ev$values, aparallel=ap$eigen$qevpea) # 确定探索性因子分析中应保留的因子
+plotnScree(nS) # 绘制碎石图
+#因子分析
+fre<-factanal(X, 3, scores="Bartlett", rotation="none")
+fre
+
+```
+因为p=0.242 > 0.05，因此这三个因子足够解释这些变量
+
+## （2）
+
+ （2）采用“体检数据”。这是一组4000多个样本的体检资料，分别有常规体检的一系列指标，其中，体检数据，请考虑下面的问题：
+一、	利用主成分方法变量进行降维，然后进行相应的主成分方法聚类分析；
+二、	构建因子分析模型，进行因子旋转，分析每个因子的意义及这些潜在的因子与年龄的关系。
+
+
+```{r 3,error=FALSE,warning = FALSE}
+data_0 <- read.csv("exam.csv",encoding = "UTF-8",na.strings=c(""," ","NA","未检"),header=T,row.names = 1)
+#处理异常值
+for (i in colnames(data_0)){
+  if (i=='Gender'){
+    data_0[,i] <- as.numeric(factor(data_0[,i]))
+  }else{
+    data_0[,i] <- impute(as.numeric(data_0[,i]),mean)
+  }
+}
+sum(is.na(data_0))
+X <- data_0
+#主成分个数分析
+library(psych)
+plot.new()
+fa.parallel(data_0,fa="pc",n.iter=100,show.legend=FALSE,main="Screen plot with parallel analysis")
+```
+
+选择6个主成分，对其进行聚类分析
+
+```{r 5,error=FALSE,warning = FALSE}
+
+pc6<-principal(data_0,nfactors=6,rotate="none") 
+X1 <- pc6[["scores"]]
+#聚类分析
+#cl_single <- NbClust(X1, distance="euclidean", 
+#              min.nc=2, max.nc=15, method="ward.D2")
+center<-sweep(X1, 2, apply(X1, 2, mean))#按列中心化
+R<-apply(X1, 2, max)-apply(X1, 2, min)#计算列极差
+X_star<-sweep(center, 2, R, "/")#极差标准化, 均值为0， 极差为1
+d<-dist(X_star,method = "euclidean")
+model1=hclust(d,method='ward.D2')
+result=cutree(model1,k=3)
+plot(model1,cex=0.1,hang=-1);re1<-rect.hclust(model1, k=3, border="red")
+
+```
+
+
+二、构建因子分析模型，进行因子旋转，分析每个因子的意义及这些潜在的因子与年龄的关系。
+
+```{r 6,error=FALSE,warning = FALSE}
+#分析因子数
+plot.new()
+fa.parallel(data_0,fa="fa",n.iter=100,show.legend=FALSE,main="Screen plot with parallel analysis")
+```
+
+得到因子个数为7
+
+```{r 7,error=FALSE,warning = FALSE}
+#因子分析
+fre<-factanal(data_0, 7, scores="Bartlett", rotation="varimax")
+fre
+```
+因子意义分析：
+Factor1 主要与年龄、身高、重量有关，Factor2主要与T.BIL、IB有关，Factor3主要与ALT、AST有关，Factor4主要与TP、GLB有关，Factor5主要与Alb有关，Factor6主要与Age、TG、TC有关。
+Factor5、6、7与年龄有潜在关系，其中Factor7有较强的正相关，Factor6有一定负相关，Factor5有一定正相关。
+
+

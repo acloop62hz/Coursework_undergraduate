@@ -1,0 +1,137 @@
+---
+title: "实验六：聚类分析和主成分分析"
+author:
+  - 沈雨萱 3180104691
+documentclass: ctexart
+geometry: "left=2.5cm,right=2cm,top=3cm,bottom=2.5cm"
+output:
+  rticles::ctex:
+    fig_caption: yes
+    number_sections: yes
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 实验概况
+一．	实验目的与要求：
+通过本试验项目，使学生理解并掌握如下内容
+（1）能够熟练利用R对数据进行聚类分析；
+（2）能够利用主成分分析方法进行变量降维。
+
+
+
+二．	实验内容 
+（1）现有16种饮料的热量、咖啡因含量、钠含量和价格的数据（见ex4.2),根据这4个变量对16种饮料进行聚类。
+（2）中国31个城市2011年的空气质量数据（见ex4.3）,根据这个数据对31个城市进行聚类分析。
+（3）某市工业部门13个行业8项重要经济指标数据，其中X1为年末固定资产净值（单位：万元）；X2为职工人数（单位：人），X3为工业总产值（单位：万元）；X4为全员劳动生产率（单位：元/人年）；X5为百元固定资产原值实现产值（单位：元）；X6为资金利税率（%）；X7为标准燃料消费量（单位：吨）；X8为能源利用效果（单位：万元/吨），数据见case6.1。根据这些数据进行主成分分析。
+
+
+
+```{r 1,echo=F,results='hide',message=FALSE,warning=FALSE}
+library(ggplot2)
+library(patchwork)
+library(ggpubr)
+library(dplyr)
+library(Hmisc)
+library(PerformanceAnalytics)
+library(NbClust)
+setwd("D:/enjoy/多元统计/第六次上机实验/第六次上机实验")
+```
+
+# 实验结果
+
+## （1）
+
+现有16种饮料的热量、咖啡因含量、钠含量和价格的数据（见ex4.2),根据这4个变量对16种饮料进行聚类。
+
+```{r 2,error=FALSE,warning = FALSE}
+data_0 <- read.csv("ex4.2.csv",encoding = "UTF-8",na.strings=c(""," ","NA"),header=T)
+data_0 <- na.omit(data_0)
+#极差标准化
+row.names(data_0) <- data_0[,1]
+X<-data_0[,-1]
+center<-sweep(X, 2, apply(X, 2, mean))#按列中心化
+R<-apply(X, 2, max)-apply(X, 2, min)#计算列极差
+X_star<-sweep(center, 2, R, "/")#极差标准化, 均值为0， 极差为1
+#确定类数量
+d<-dist(X_star,method = "euclidean")
+heatmap(as.matrix(d),labRow = F, labCol = F)
+wss <- (nrow(X_star)-1)*sum(apply(X_star,2,var))
+for (i in 2:15)
+wss[i] <- sum(kmeans(X_star,centers=i)$withinss)
+###这里的wss(within-cluster sum of squares)是组内平方和
+plot(1:15, wss, type="b", xlab="Number of Clusters",ylab="Within groups sum of squares")
+
+```
+
+在分成6类时组内平方和下降存在一个拐点，结合热图利用kmeans将饮料分为6类。
+
+```{r 3,error=FALSE,warning = FALSE,message=FALSE}
+km <- kmeans(X_star, 6, algorithm="MacQueen")
+km
+mds=cmdscale(d,k=2,eig=T)
+x = mds$points[,1]
+y = mds$points[,2]
+p=ggplot(data.frame(x,y),aes(x,y))
+p+geom_point(size=5,alpha=0.8,
+             aes(colour=factor(km$cluster)))+geom_text(aes(x, y,label = rownames(X_star)),size=3)
+```
+
+## （2）
+
+中国31个城市2011年的空气质量数据（见ex4.3）,根据这个数据对31个城市进行聚类分析
+
+
+```{r 4,error=FALSE,warning = FALSE}
+data_0 <- read.csv("ex4.3.csv",encoding = "UTF-8",na.strings=c(""," ","NA"),header=T,row.names = 1)
+X <- na.omit(data_0)
+#极差标准化
+center<-sweep(X, 2, apply(X, 2, mean))#按列中心化
+R<-apply(X, 2, max)-apply(X, 2, min)#计算列极差
+X_star<-sweep(center, 2, R, "/")#极差标准化, 均值为0， 极差为1
+#确定类数量
+d<-dist(X_star,method = "euclidean")
+heatmap(as.matrix(d),labRow = F, labCol = F)
+wss <- (nrow(X_star)-1)*sum(apply(X_star,2,var))
+for (i in 2:15)
+wss[i] <- sum(kmeans(X_star,centers=i)$withinss)
+###这里的wss(within-cluster sum of squares)是组内平方和
+plot(1:15, wss, type="b", xlab="Number of Clusters",ylab="Within groups sum of squares")
+```
+
+在分成6类时组内平方和下降存在一个拐点，结合热图利用kmeans城市分为6类
+
+```{r 5,error=FALSE,warning = FALSE}
+km <- kmeans(X_star, 6, algorithm="MacQueen")
+km
+mds=cmdscale(d,k=2,eig=T)
+x = mds$points[,1]
+y = mds$points[,2]
+p=ggplot(data.frame(x,y),aes(x,y))
+p+geom_point(size=5,alpha=0.8,
+             aes(colour=factor(km$cluster)))+geom_text(aes(x, y,label = rownames(X_star)),size=3)
+
+```
+
+## （3）
+
+某市工业部门13个行业8项重要经济指标数据，其中X1为年末固定资产净值（单位：万元）；X2为职工人数（单位：人），X3为工业总产值（单位：万元）；X4为全员劳动生产率（单位：元/人年）；X5为百元固定资产原值实现产值（单位：元）；X6为资金利税率（%）；X7为标准燃料消费量（单位：吨）；X8为能源利用效果（单位：万元/吨），数据见case6.1。根据这些数据进行主成分分析。
+
+```{r 6,error=FALSE,warning = FALSE}
+data_0 <- read.csv("case6.1.csv",encoding = "UTF-8",na.strings=c(""," ","NA"),header=T,row.names = 1)
+X <- na.omit(data_0)
+#极差标准化
+center<-sweep(X, 2, apply(X, 2, mean))#按列中心化
+R<-apply(X, 2, max)-apply(X, 2, min)#计算列极差
+X_star<-sweep(center, 2, R, "/")#极差标准化, 均值为0， 极差为1
+X.pr <- princomp(X, cor = TRUE)
+summary(X.pr, loadings=TRUE)
+predict(X.pr)
+
+```
+
+由于前4个主成分已经达到94%，因此就保留4个成分.可以看到第一个主成分主要由X1为年末固定资产净值，X2为职工人数，X3为工业总产值决定，第二个主成分X4为全员劳动生产率，X5为百元固定资产原值实现产值，X6为资金利税率（%）占更多部分，第三个主成分主要由X8能源利用效果决定，第四个主成分主要由X7标准燃料消费量决定。
+

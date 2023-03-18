@@ -1,0 +1,41 @@
+#case 1
+1 1 
+Zoe_Bill 35 2333 
+1 30 40
+#case 2
+9 4 
+Zoe_Bill 80 2333 
+Bob_Volk 35 5888 
+Anny_Cin 95 999999 
+Williams 30 -22 
+Alice 18 5888 
+Joe_Mike 32 6667 
+Rosemary 40 5888 
+Dobby 35 5888 
+Billy 35 5888 
+6 15 45 
+4 70 90 
+4 15 45 
+1 45 50
+#case 3
+16 4 
+Zoe_Bill 80 2333 
+Bob_Volk 35 5888 
+Anny_Cin 95 999999 
+Christ_k 47 2100 
+Nobody 5 0 
+Logic_bo 23 390 
+Ariana_g 25 18900 
+Mariah 90 4783 
+Williams 30 -22 
+Alice 18 5888 
+Joe_Mike 32 6667 
+Rosemary 40 5888 
+Dobby 35 5888 
+Billy 35 5888 
+Vander_wo 67 56673 
+Blake_bl 25 18900 
+6 15 45 
+4 70 90
+4 15 45 
+1 100 108

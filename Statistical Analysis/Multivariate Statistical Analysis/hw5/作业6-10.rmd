@@ -1,0 +1,247 @@
+---
+title: "实验五：聚类分析"
+author:
+  - 沈雨萱 3180104691
+documentclass: ctexart
+geometry: "left=2.5cm,right=2cm,top=3cm,bottom=2.5cm"
+output:
+  rticles::ctex:
+    fig_caption: yes
+    number_sections: yes
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r 1,echo=F,results='hide',message=FALSE,warning=FALSE}
+library(ggplot2)
+library(patchwork)
+library(ggpubr)
+library(dplyr)
+library(Hmisc)
+library(PerformanceAnalytics)
+library(NbClust)
+library(vegan)
+setwd("D:/enjoy/多元统计/第五次上机实验/第五次上机实验/第五次上机实验")
+```
+
+# 1. 6个弹头分类
+
+
+```{r 2,error=FALSE,warning = FALSE}
+data_0 <- read.csv("6-10.csv",encoding = "UTF-8",na.strings=c(""," ","NA"),header=T,row.names = 1) 
+X<-data_0
+#极差标准化
+center<-sweep(X, 2, apply(X, 2, mean))#按列中心化
+R<-apply(X, 2, max)-apply(X, 2, min)#计算列极差
+X_star<-sweep(center, 2, R, "/")#极差标准化, 均值为0， 极差为1
+
+```
+
+
+```{r 3, error=FALSE,warning = FALSE}
+d<-dist(X_star,method = "euclidean")
+heatmap(as.matrix(d),labRow = F, labCol = F)
+
+```
+
+从热图来看，大致可以分成3类
+
+1 最短距离法聚类
+
+```{r 4,error=FALSE,warning = FALSE}
+model1=hclust(d,method='single')
+result=cutree(model1,k=3)
+plot(model1,cex=1,hang=-1);re1<-rect.hclust(model1, k=3, border="red")
+
+mds=cmdscale(d,k=2,eig=T)
+x = mds$points[,1]
+y = mds$points[,2]
+p=ggplot(data.frame(x,y),aes(x,y))
+p+geom_point(size=3,alpha=0.8,
+             aes(colour=factor(result)))
+
+```
+
+
+2 最长距离法聚类
+
+```{r 5,error=FALSE,warning = FALSE,echo=F}
+model1=hclust(d,method='complete')
+result=cutree(model1,k=3)
+plot(model1,cex=1,hang=-1);re1<-rect.hclust(model1, k=3, border="red")
+
+mds=cmdscale(d,k=2,eig=T)
+x = mds$points[,1]
+y = mds$points[,2]
+p=ggplot(data.frame(x,y),aes(x,y))
+p+geom_point(size=3,alpha=0.8,
+             aes(colour=factor(result)))
+
+```
+
+
+3 中间距离法聚类
+
+```{r 6,error=FALSE,warning = FALSE,echo=F}
+model1=hclust(d,method='median')
+result=cutree(model1,k=3)
+plot(model1,cex=1,hang=-1);re1<-rect.hclust(model1, k=3, border="red")
+
+mds=cmdscale(d,k=2,eig=T)
+x = mds$points[,1]
+y = mds$points[,2]
+p=ggplot(data.frame(x,y),aes(x,y))
+p+geom_point(size=3,alpha=0.8,
+             aes(colour=factor(result)))
+
+```
+
+
+4 类平均法
+
+```{r 7,error=FALSE,warning = FALSE,echo=F}
+model1=hclust(d,method='average')
+result=cutree(model1,k=3)
+plot(model1,cex=1,hang=-1);re1<-rect.hclust(model1, k=3, border="red")
+
+mds=cmdscale(d,k=2,eig=T)
+x = mds$points[,1]
+y = mds$points[,2]
+p=ggplot(data.frame(x,y),aes(x,y))
+p+geom_point(size=3,alpha=0.8,
+             aes(colour=factor(result)))
+
+```
+
+
+5 离差重心法
+
+```{r 8,error=FALSE,warning = FALSE,echo=F}
+
+model1=hclust(d,method='ward.D2')
+result=cutree(model1,k=3)
+plot(model1,cex=1,hang=-1);re1<-rect.hclust(model1, k=3, border="red")
+
+mds=cmdscale(d,k=2,eig=T)
+x = mds$points[,1]
+y = mds$points[,2]
+p=ggplot(data.frame(x,y),aes(x,y))
+p+geom_point(size=3,alpha=0.8,
+             aes(colour=factor(result)))
+
+```
+
+由以上结果可以看出离差重心法与最长聚类法结果类似，最短距离法、中间距离法、类距离法结果类似
+
+# 1. 7个微量元素分类
+
+
+```{r 9,error=FALSE,warning = FALSE}
+data_0 <- read.csv("6-10.csv",encoding = "UTF-8",na.strings=c(""," ","NA"),header=T,row.names = 1) 
+X<-t(data_0)
+#极差标准化
+center<-sweep(X, 2, apply(X, 2, mean))#按列中心化
+R<-apply(X, 2, max)-apply(X, 2, min)#计算列极差
+X_star<-sweep(center, 2, R, "/")#极差标准化, 均值为0， 极差为1
+
+```
+
+
+```{r 10,error=FALSE,warning = FALSE}
+d<-dist(X_star,method = "euclidean")
+heatmap(as.matrix(d),labRow = F, labCol = F)
+
+```
+
+从热图来看，大致可以分成2类
+
+1 最短距离法聚类
+
+```{r 11,error=FALSE,warning = FALSE}
+model1=hclust(d,method='single')
+result=cutree(model1,k=2)
+plot(model1,cex=1,hang=-1);re1<-rect.hclust(model1, k=2, border="red")
+
+mds=cmdscale(d,k=2,eig=T)
+x = mds$points[,1]
+y = mds$points[,2]
+p=ggplot(data.frame(x,y),aes(x,y))
+p+geom_point(size=3,alpha=0.8,
+             aes(colour=factor(result)))
+
+```
+
+2 最长距离法聚类
+
+```{r 12,error=FALSE,warning = FALSE,echo=F}
+model1=hclust(d,method='complete')
+result=cutree(model1,k=2)
+plot(model1,cex=1,hang=-1);re1<-rect.hclust(model1, k=2, border="red")
+
+mds=cmdscale(d,k=2,eig=T)
+x = mds$points[,1]
+y = mds$points[,2]
+p=ggplot(data.frame(x,y),aes(x,y))
+p+geom_point(size=3,alpha=0.8,
+             aes(colour=factor(result)))
+
+```
+
+
+3 中间距离法聚类
+
+```{r 13,error=FALSE,warning = FALSE,echo=F}
+model1=hclust(d,method='median')
+result=cutree(model1,k=2)
+plot(model1,cex=1,hang=-1);re1<-rect.hclust(model1, k=2, border="red")
+
+mds=cmdscale(d,k=2,eig=T)
+x = mds$points[,1]
+y = mds$points[,2]
+p=ggplot(data.frame(x,y),aes(x,y))
+p+geom_point(size=3,alpha=0.8,
+             aes(colour=factor(result)))
+
+```
+
+
+4 类平均法
+
+```{r 14,error=FALSE,warning = FALSE,echo=F}
+model1=hclust(d,method='average')
+result=cutree(model1,k=2)
+plot(model1,cex=1,hang=-1);re1<-rect.hclust(model1, k=2, border="red")
+
+mds=cmdscale(d,k=2,eig=T)
+x = mds$points[,1]
+y = mds$points[,2]
+p=ggplot(data.frame(x,y),aes(x,y))
+p+geom_point(size=3,alpha=0.8,
+             aes(colour=factor(result)))
+
+```
+
+
+5 离差重心法
+
+```{r 15,error=FALSE,warning = FALSE,echo=F}
+
+model1=hclust(d,method='ward.D2')
+result=cutree(model1,k=2)
+plot(model1,cex=1,hang=-1);re1<-rect.hclust(model1, k=2, border="red")
+
+mds=cmdscale(d,k=2,eig=T)
+x = mds$points[,1]
+y = mds$points[,2]
+p=ggplot(data.frame(x,y),aes(x,y))
+p+geom_point(size=3,alpha=0.8,
+             aes(colour=factor(result)))
+
+```
+
+由结果，离差重心和最长距离结果类似，其余类似。

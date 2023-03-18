@@ -1,0 +1,472 @@
+---
+title: "实验五：聚类分析"
+author:
+  - 沈雨萱 3180104691
+documentclass: ctexart
+geometry: "left=2.5cm,right=2cm,top=3cm,bottom=2.5cm"
+output:
+  rticles::ctex:
+    fig_caption: yes
+    number_sections: yes
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 实验概况
+一．	实验目的与要求：
+通过本试验项目，使学生理解并掌握如下内容
+(1) 处理聚类分析的基本步骤；
+(2) 熟悉各类聚类方法；
+
+
+
+二．	实验内容 
+本实验采用“建筑数据”。这是一组48幢建筑的资料，有建筑面积，已经使用年份，结构，屋顶形式，电梯情况，空调个数，居住户数，07年和08年用电量.
+
+
+```{r 1,echo=F,results='hide',message=FALSE,warning=FALSE}
+library(ggplot2)
+library(patchwork)
+library(ggpubr)
+library(dplyr)
+library(Hmisc)
+library(PerformanceAnalytics)
+library(NbClust)
+library(vegan)
+setwd("D:/enjoy/多元统计/第五次上机实验/第五次上机实验/第五次上机实验")
+```
+
+# 实验结果
+
+一、	数据来源和数据预测处理
+对数据进行正态性分析、相关性分析等 
+
+首先进行缺失值分析，由于有较多缺失值集中于Aircondition与Families，因此用平均值进行填补.
+
+```{r 2,error=FALSE,warning = FALSE}
+data_0 <- read.csv("data.csv",encoding = "UTF-8",na.strings=c(""," ","NA"),header=T) 
+sum(is.na(data_0))
+data <- data_0
+data$Aircondition <- impute(data_0$Aircondition,mean)
+data$Families <- impute(data_0$Families,mean)
+```
+
+进行正态性和相关性分析
+
+```{r 3,error=FALSE,warning = FALSE,message=FALSE}
+X=data[,c('Area','Nyear','Lifts','Aircondition','Families','Y07SUM','Y08SUM')]
+r <- rcorr(as.matrix(X))
+chart.Correlation(X, histogram=TRUE, pch=19)
+c1 <- ggqqplot(X$Area,main='Area')
+c2 <- ggqqplot(X$Nyear,main='Nyear')
+c3 <- ggqqplot(X$Lifts,main='Lifts')
+c4 <- ggqqplot(X$Aircondition,main='Aircondition')
+c5 <- ggqqplot(X$Families,main='Families')
+c6 <- ggqqplot(X$Y07SUM,main='Y07SUM')
+c7 <- ggqqplot(X$Y08SUM,main='Y08SUM')
+c1+c2+c3+c4+c5+c6+c7
+```
+较符合正态性的量有Area, Families, Y07SUM, Y08SUM
+
+## 二、	利用聚类方法对482憧建筑进行分类，并分析每类的特征
+
+
+a.数据中心化与标准化变换
+
+```{r 4,error=FALSE,warning = FALSE}
+#将结构和屋顶两项数值化
+X$Constr=as.numeric(factor(data$Constr))
+X$Form=as.numeric(factor(data$Form))
+#极差标准化
+center<-sweep(X, 2, apply(X, 2, mean))#按列中心化
+R<-apply(X, 2, max)-apply(X, 2, min)#计算列极差
+X_star<-sweep(center, 2, R, "/")#极差标准化, 均值为0， 极差为1
+```
+
+b.系统聚类
+
+```{r 5,error=FALSE,warning = FALSE}
+d<-dist(X_star,method = "euclidean")
+heatmap(as.matrix(d),labRow = F, labCol = F)
+#确定各类方法聚类个数，由于输出较多只展示最短距离法
+cl_single <- NbClust(X_star, distance="euclidean", 
+              min.nc=2, max.nc=15, method="ward.D2")
+
+```
+
+从热图来看，大致可以分成2-4类。由NbCluster分析结果得，最短距离法最佳聚为2类，最长距离法最佳聚为3类，中间距离法最佳聚为2类，类平均法最佳聚为2类，离差重心法最佳为2类
+
+b.1 最短距离法聚类
+
+```{r 6,error=FALSE,warning = FALSE}
+model1=hclust(d,method='single')
+result=cutree(model1,k=2)
+plot(model1,cex=0.1,hang=-1);re1<-rect.hclust(model1, k=2, border="red")
+
+mds=cmdscale(d,k=2,eig=T)
+x = mds$points[,1]
+y = mds$points[,2]
+p=ggplot(data.frame(x,y),aes(x,y))
+p+geom_point(size=3,alpha=0.8,
+             aes(colour=factor(result)))
+
+X_single <- X_star
+X_single[,'cluster']=result
+opar<-par(mfrow=c(3,3), mar=c(5.2,4,0,0))
+plot(X_single$cluster,X_single$Lifts,ylab = "Lifts")
+plot(X_single$cluster,X_single$Area,ylab="Area")
+plot(X_single$cluster,X_single$Nyear,ylab="Nyear")
+plot(X_single$cluster,X_single$Aircondition,ylab="Aircondition")
+plot(X_single$cluster,X_single$Families,ylab="Families")
+plot(X_single$cluster,X_single$Y07SUM,ylab="Y07SUM")
+plot(X_single$cluster,X_single$Y08SUM,ylab="Y08SUM")
+plot(X_single$cluster,X_single$Constr,ylab="Constr")
+plot(X_single$cluster,X_single$Form,ylab="Form")
+par(opar)
+
+```
+该方法将建筑分为两类，1类有316个，2类有168个。1类的特点是电梯数较少，结构为混砖结构，面积相对较小；2类的特点是电梯数量较分散，结构为框架结构。
+
+b.2 最长距离法聚类
+
+```{r 7,error=FALSE,warning = FALSE,echo=F}
+model1=hclust(d,method='complete')
+result=cutree(model1,k=3)
+plot(model1,cex=0.1,hang=-1);re1<-rect.hclust(model1, k=3, border="red")
+
+mds=cmdscale(d,k=2,eig=T)
+x = mds$points[,1]
+y = mds$points[,2]
+p=ggplot(data.frame(x,y),aes(x,y))
+p+geom_point(size=3,alpha=0.8,
+             aes(colour=factor(result)))
+
+X_single <- X_star
+X_single[,'cluster']=result
+opar<-par(mfrow=c(3,3), mar=c(5.2,4,0,0))
+plot(X_single$cluster,X_single$Lifts,ylab = "Lifts")
+plot(X_single$cluster,X_single$Area,ylab="Area")
+plot(X_single$cluster,X_single$Nyear,ylab="Nyear")
+plot(X_single$cluster,X_single$Aircondition,ylab="Aircondition")
+plot(X_single$cluster,X_single$Families,ylab="Families")
+plot(X_single$cluster,X_single$Y07SUM,ylab="Y07SUM")
+plot(X_single$cluster,X_single$Y08SUM,ylab="Y08SUM")
+plot(X_single$cluster,X_single$Constr,ylab="Constr")
+plot(X_single$cluster,X_single$Form,ylab="Form")
+par(opar)
+
+```
+该方法将建筑分为3类。1类有312个，电梯数量较少，年份相对较多，结构为混砖结构；2类有18个，年份较少，07年、08年用电量较高；3类电梯数量较分散，结构为框架结构。
+
+b.3 中间距离法聚类
+
+```{r 8,error=FALSE,warning = FALSE,echo=F}
+model1=hclust(d,method='median')
+result=cutree(model1,k=2)
+plot(model1,cex=0.1,hang=-1);re1<-rect.hclust(model1, k=2, border="red")
+
+mds=cmdscale(d,k=2,eig=T)
+x = mds$points[,1]
+y = mds$points[,2]
+p=ggplot(data.frame(x,y),aes(x,y))
+p+geom_point(size=3,alpha=0.8,
+             aes(colour=factor(result)))
+
+X_single <- X_star
+X_single[,'cluster']=result
+opar<-par(mfrow=c(3,3), mar=c(5.2,4,0,0))
+plot(X_single$cluster,X_single$Lifts,ylab = "Lifts")
+plot(X_single$cluster,X_single$Area,ylab="Area")
+plot(X_single$cluster,X_single$Nyear,ylab="Nyear")
+plot(X_single$cluster,X_single$Aircondition,ylab="Aircondition")
+plot(X_single$cluster,X_single$Families,ylab="Families")
+plot(X_single$cluster,X_single$Y07SUM,ylab="Y07SUM")
+plot(X_single$cluster,X_single$Y08SUM,ylab="Y08SUM")
+plot(X_single$cluster,X_single$Constr,ylab="Constr")
+plot(X_single$cluster,X_single$Form,ylab="Form")
+par(opar)
+
+```
+该方法将建筑分为两类，1类只有一个。
+
+b.4 类平均法
+
+```{r 9,error=FALSE,warning = FALSE,echo=F}
+model1=hclust(d,method='average')
+result=cutree(model1,k=2)
+plot(model1,cex=0.1,hang=-1);re1<-rect.hclust(model1, k=2, border="red")
+
+mds=cmdscale(d,k=2,eig=T)
+x = mds$points[,1]
+y = mds$points[,2]
+p=ggplot(data.frame(x,y),aes(x,y))
+p+geom_point(size=3,alpha=0.8,
+             aes(colour=factor(result)))
+
+X_single <- X_star
+X_single[,'cluster']=result
+opar<-par(mfrow=c(3,3), mar=c(5.2,4,0,0))
+plot(X_single$cluster,X_single$Lifts,ylab = "Lifts")
+plot(X_single$cluster,X_single$Area,ylab="Area")
+plot(X_single$cluster,X_single$Nyear,ylab="Nyear")
+plot(X_single$cluster,X_single$Aircondition,ylab="Aircondition")
+plot(X_single$cluster,X_single$Families,ylab="Families")
+plot(X_single$cluster,X_single$Y07SUM,ylab="Y07SUM")
+plot(X_single$cluster,X_single$Y08SUM,ylab="Y08SUM")
+plot(X_single$cluster,X_single$Constr,ylab="Constr")
+plot(X_single$cluster,X_single$Form,ylab="Form")
+par(opar)
+
+```
+该方法将建筑分为两类，1类只有一个。
+
+b.5 离差重心法
+
+```{r 10,error=FALSE,warning = FALSE,echo=F}
+
+model1=hclust(d,method='ward.D2')
+result=cutree(model1,k=2)
+plot(model1,cex=0.1,hang=-1);re1<-rect.hclust(model1, k=2, border="red")
+
+mds=cmdscale(d,k=2,eig=T)
+x = mds$points[,1]
+y = mds$points[,2]
+p=ggplot(data.frame(x,y),aes(x,y))
+p+geom_point(size=3,alpha=0.8,
+             aes(colour=factor(result)))
+
+X_single <- X_star
+X_single[,'cluster']=result
+opar<-par(mfrow=c(3,3), mar=c(5.2,4,0,0))
+plot(X_single$cluster,X_single$Lifts,ylab = "Lifts")
+plot(X_single$cluster,X_single$Area,ylab="Area")
+plot(X_single$cluster,X_single$Nyear,ylab="Nyear")
+plot(X_single$cluster,X_single$Aircondition,ylab="Aircondition")
+plot(X_single$cluster,X_single$Families,ylab="Families")
+plot(X_single$cluster,X_single$Y07SUM,ylab="Y07SUM")
+plot(X_single$cluster,X_single$Y08SUM,ylab="Y08SUM")
+plot(X_single$cluster,X_single$Constr,ylab="Constr")
+plot(X_single$cluster,X_single$Form,ylab="Form")
+par(opar)
+
+```
+该方法将建筑分为两类，1类168个，电梯的数量分散，面积相对较大，结构为混砖结构；2类有316个，电梯数量较少，面积相对较小，结构为框架结构。
+
+c.动态聚类法
+
+```{r 11,error=FALSE,warning = FALSE}
+km <- kmeans(X_star, 2, algorithm="MacQueen")
+km
+mds=cmdscale(d,k=2,eig=T)
+x = mds$points[,1]
+y = mds$points[,2]
+p=ggplot(data.frame(x,y),aes(x,y))
+p+geom_point(size=3,alpha=0.8,
+             aes(colour=factor(km$cluster)))
+X_single <- X_star
+X_single[,'cluster']=km$cluster
+opar<-par(mfrow=c(3,3), mar=c(5.2,4,0,0))
+plot(X_single$cluster,X_single$Lifts,ylab = "Lifts")
+plot(X_single$cluster,X_single$Area,ylab="Area")
+plot(X_single$cluster,X_single$Nyear,ylab="Nyear")
+plot(X_single$cluster,X_single$Aircondition,ylab="Aircondition")
+plot(X_single$cluster,X_single$Families,ylab="Families")
+plot(X_single$cluster,X_single$Y07SUM,ylab="Y07SUM")
+plot(X_single$cluster,X_single$Y08SUM,ylab="Y08SUM")
+plot(X_single$cluster,X_single$Constr,ylab="Constr")
+plot(X_single$cluster,X_single$Form,ylab="Form")
+par(opar)
+```
+
+动态聚类法分两类时结果与离差重心法类似
+
+## 三、	比较类之间的差异，结合使用年份去分析各时期建筑的特点等。
+
+按照上述动态聚类法及离心重力法的分类结果，第一类：
+
+```{r 12,error=FALSE,warning = FALSE}
+X_single <- X_star
+X_single[,'cluster']=km$cluster
+X1<-X_single %>% filter(cluster==1)
+X2<-X_single %>% filter(cluster==2)
+opar<-par(mfrow=c(3,3), mar=c(5.2,4,0,0))
+plot(X1$Nyear,X1$Lifts,ylab = "Lifts")
+plot(X1$Nyear,X1$Area,ylab="Area")
+plot(X1$Nyear,X1$Aircondition,ylab="Aircondition")
+plot(X1$Nyear,X1$Families,ylab="Families")
+plot(X1$Nyear,X1$Y07SUM,ylab="Y07SUM")
+plot(X1$Nyear,X1$Y08SUM,ylab="Y08SUM")
+plot(X1$Nyear,X1$Constr,ylab="Constr")
+plot(X1$Nyear,X1$Form,ylab="Form")
+par(opar)
+```
+第一类中，随着使用年份增长，电梯数量减少，面积减小，空调数目先增加后减少，家庭数目先增加后减少，07、08年用电量减少，结构均为框架结构
+
+第二类：
+
+```{r 13,error=FALSE,warning = FALSE}
+X_single <- X_star
+X_single[,'cluster']=km$cluster
+X1<-X_single %>% filter(cluster==1)
+X2<-X_single %>% filter(cluster==2)
+opar<-par(mfrow=c(3,3), mar=c(5.2,4,0,0))
+plot(X2$Nyear,X2$Lifts,ylab = "Lifts")
+plot(X2$Nyear,X2$Area,ylab="Area")
+plot(X2$Nyear,X2$Aircondition,ylab="Aircondition")
+plot(X2$Nyear,X2$Families,ylab="Families")
+plot(X2$Nyear,X2$Y07SUM,ylab="Y07SUM")
+plot(X2$Nyear,X2$Y08SUM,ylab="Y08SUM")
+plot(X2$Nyear,X2$Constr,ylab="Constr")
+plot(X2$Nyear,X2$Form,ylab="Form")
+par(opar)
+```
+第二类中，随着使用年份增长，电梯数量基本不变，面积先快速减小后上升，空调数目、07、08年用电量减少和家庭数目以较快速度减少，结构均为混砖结构，屋顶三种类型都有。
+
+## 四、	按使用的年限进行有序分类，看看每个不同阶段建筑的特点。
+
+```{r 14,error=FALSE,warning = FALSE}
+ocluster = function(datasam, classnum) {
+    #有序样本聚类，输入datasam为样本数据阵，每一行为一个样本；
+#输入classnum为要分的类数
+#返回值result1为分类结果示意图
+#各类的起始点存在变量breaks中
+#输出三个矩阵 ra_dis:距离矩阵 leastlost:最小损失矩阵 classid:分类标识矩阵
+#author:banmudi 2010.11
+
+
+
+#样本数
+    sam_n = dim(datasam)[1]
+    #子函数，计算i-j个样本组成的类的半径
+    radi = function(i, j) {
+        #提取i-j个样本
+        temp =as.matrix( datasam[i:j, ])
+            mu = colMeans(matrix(temp,j-i+1))
+            vec = apply(matrix(temp,j-i+1), 1, function(x) {
+                x - mu
+            })
+            round(sum(apply(matrix(vec,j-i+1), 2, crossprod)),3)   
+    }
+   
+   
+    #计算距离矩阵
+    ra_dis = matrix(0, sam_n, sam_n)
+rownames(ra_dis) = 1:sam_n
+    colnames(ra_dis) = 1:sam_n
+    for (i in 1:(sam_n - 1)) {
+        for (j in (i + 1):sam_n) {
+            ra_dis[i, j] = radi(i, j)
+            ra_dis[j, i] = radi(i, j)
+        }
+    }
+   
+    #最小损失矩阵，行为样本数，列为分类数
+#leastlost[i,j]表示把1:i样本分成j类对应的最小损失
+    leastlost = matrix(, sam_n - 1, sam_n - 1)
+    rownames(leastlost) = 2:sam_n
+    colnames(leastlost) = 2:sam_n
+diag(leastlost) = 0
+    #round(leastlost,3);
+
+    #记录下对应的分类结点
+    classid = matrix(, sam_n - 1, sam_n - 1)
+    rownames(classid) = 2:sam_n
+    colnames(classid) = 2:sam_n
+    diag(classid) = 2:sam_n
+
+
+    #分成两类时，填写最小损失阵的第一列
+    leastlost[as.character(3:sam_n), "2"] = sapply(3:sam_n,
+        function(xn) {
+            min(ra_dis[1, 1:(xn - 1)] + ra_dis[2:xn, xn])
+        })
+    classid[as.character(3:sam_n), "2"] = sapply(3:sam_n, function(xn) {
+        which((ra_dis[1, 1:(xn - 1)] + ra_dis[2:xn, xn]) == (min(ra_dis[1,
+            1:(xn - 1)] + ra_dis[2:xn, xn])))[1] + 1
+    })
+    #分成j类时，填写最小损失阵的 第二列到最后一列
+    for (j in as.character(3:(sam_n - 1))) {
+        #分成j类
+        leastlost[as.character((as.integer(j) + 1):sam_n), j] = sapply((as.integer(j) +
+            1):sam_n, function(xn) {
+            min(leastlost[as.character(j:xn - 1), as.character(as.integer(j) -
+                1)] + ra_dis[j:xn, xn])
+        })
+       
+        classid[as.character((as.integer(j) + 1):sam_n), j] = sapply((as.integer(j) +
+            1):sam_n, function(xn) {
+            a = which((leastlost[as.character(j:xn - 1), as.character(as.integer(j) -
+                1)] + ra_dis[j:xn, xn]) == min(leastlost[as.character(j:xn -
+                1), as.character(as.integer(j) - 1)] + ra_dis[j:xn,
+                xn]))[1] + as.integer(j) - 1
+        })
+    }
+   
+    diag(classid) = 2:sam_n
+   
+    breaks = rep(0, 1, classnum)
+    breaks[1] = 1
+    breaks[classnum] = classid[as.character(sam_n), as.character(classnum)]
+    flag = classnum - 1
+    while (flag >= 2) {
+        breaks[flag] = classid[as.character(breaks[flag + 1] -
+            1), as.character(flag)]
+        flag = flag - 1
+    }
+
+#print("distance matrix:");#cat("\n")
+#print(ra_dis[2:sam_n,1:(sam_n-1)], na.print = ""); #输出距离矩阵
+#    print("leastlost matrix:")
+#print(leastlost[2:(sam_n-1),1:(sam_n-2)], na.print = ""); #输出最小损失矩阵
+#print("classid matrix:")
+#print(classid[2:(sam_n-1),1:(sam_n-2)], na.print = ""); #输出分类标识矩阵
+#    cat("\n")
+#print("result")
+#画一个简单的分类示意图
+    result1=NULL
+    for (p in 1:sam_n) {
+        result1 <- cat(result1,p, " ")
+        for (w in 1:length(breaks)) {
+            if (p == breaks[w] - 1) {
+                result1 <- cat(result1, "||")
+            }
+        }
+        if (p == sam_n)
+           result1= cat(result1, "\n")
+    }
+    return(breaks)
+}
+
+X_order=X_star[order(X_star$Nyear),]
+re <- ocluster(X_order,2)
+cl<-c(rep(1,re[2]-1),rep(2,nrow(X_order)-re[2]+1))
+d<-dist(X_order,method = "euclidean")
+mds=cmdscale(d,k=2,eig=T)
+x = mds$points[,1]
+y = mds$points[,2]
+p=ggplot(data.frame(x,y),aes(x,y))
+p+geom_point(size=3,alpha=0.8,
+             aes(colour=factor(cl)))
+
+X[order(X$Nyear),][re[2],'Nyear']
+
+Xo <- X[order(X$Nyear),]
+Xo[,'cluster']=cl
+opar<-par(mfrow=c(3,3), mar=c(5.2,4,0,0))
+plot(Xo$cluster,Xo$Lifts,ylab = "Lifts")
+plot(Xo$cluster,Xo$Area,ylab="Area")
+plot(Xo$cluster,Xo$Aircondition,ylab="Aircondition")
+plot(Xo$cluster,Xo$Families,ylab="Families")
+plot(Xo$cluster,Xo$Y07SUM,ylab="Y07SUM")
+plot(Xo$cluster,Xo$Y08SUM,ylab="Y08SUM")
+plot(Xo$cluster,Xo$Constr,ylab="Constr")
+plot(Xo$cluster,Xo$Form,ylab="Form")
+par(opar)
+
+```
+
+利用有序聚类法将目标分为两类，第一类的使用年限小于15年，第二类的使用年限大于等于15年。使用年限小于15年的建筑相对面积更大，家庭更多，电梯数量分布更分散，07、08年的用电量更多；使用年限大于15年的各项都相对更小一些。
+
